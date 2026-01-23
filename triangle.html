@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>WebGPU Triangle</title>
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    background: #111;
+  }
+  canvas {
+    display: block;
+    width: 100vw;
+    height: 100vh;
+  }
+</style>
+</head>
+<body>
+<canvas id="gfx"></canvas>
+<script type="module">
+(async () => {
+  if (!navigator.gpu) {
+    alert("WebGPU not supported");
+    return;
+  }
+
+  const canvas = document.getElementById("gfx");
+  const adapter = await navigator.gpu.requestAdapter();
+  const device = await adapter.requestDevice();
+
+  const context = canvas.getContext("webgpu");
+  const format = navigator.gpu.getPreferredCanvasFormat();
+
+  function resize() {
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = canvas.clientWidth * dpr;
+    canvas.height = canvas.clientHeight * dpr;
+    context.configure({
+      device,
+      format,
+      alphaMode: "opaque"
+    });
+  }
+  window.addEventListener("resize", resize);
+  resize();
+
+  // ---------- Shaders ----------
+  const shaderModule = device.createShaderModule({
+    code: `
+    struct VSOut {
+        @builtin(position) position : vec4f,
+        @location(0) color : vec3f,
+    };
+
+    @vertex
+    fn vs_main(@builtin(vertex_index) index: u32) -> VSOut {
+        var positions = array<vec2f, 3>(
+            vec2f( 0.0,  0.6),
+            vec2f(-0.6, -0.6),
+            vec2f( 0.6, -0.6)
+        );
+
+        var colors = array<vec3f, 3>(
+            vec3f(0.2, 0.7, 1.0), // top - blue
+            vec3f(1.0, 0.2, 0.2), // left - red
+            vec3f(0.2, 1.0, 0.2)  // right - green
+        );
+
+        var out : VSOut;
+        out.position = vec4f(positions[index], 0.0, 1.0);
+        out.color = colors[index];
+        return out;
+    }
+
+    @fragment
+    fn fs_main(in : VSOut) -> @location(0) vec4f {
+        return vec4f(in.color, 1.0);
+    }
+    `
+  });
+
+  // ---------- Pipeline ----------
+  const pipeline = device.createRenderPipeline({
+    layout: "auto",
+    vertex: {
+      module: shaderModule,
+      entryPoint: "vs_main"
+    },
+    fragment: {
+      module: shaderModule,
+      entryPoint: "fs_main",
+      targets: [{ format }]
+    },
+    primitive: {
+      topology: "triangle-list"
+    }
+  });
+
+  // ---------- Render loop ----------
+  function frame() {
+    const commandEncoder = device.createCommandEncoder();
+
+    const pass = commandEncoder.beginRenderPass({
+      colorAttachments: [{
+        view: context.getCurrentTexture().createView(),
+        loadOp: "clear",
+        clearValue: { r: 0.05, g: 0.05, b: 0.05, a: 1 },
+        storeOp: "store"
+      }]
+    });
+
+    pass.setPipeline(pipeline);
+    pass.draw(3);
+    pass.end();
+
+    device.queue.submit([commandEncoder.finish()]);
+    requestAnimationFrame(frame);
+  }
+
+  frame();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,381 @@
+<html>
+<head>
+    <title>My Web Page</title>  
+    <style>
+     html, body {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+}
+
+canvas {
+    display: block;      /* removes inline-canvas whitespace */
+    width: 100vw;
+    height: 100vh;
+}
+    </style>
+</head>
+<body>
+    <canvas id="myCanvas" width="1200" height="800" style="border:1px solid #000000;"></canvas>
+    <script type="module">
+async function main() {
+
+const fnt_source = `char id=32 x=0 y=0 width=0 height=0 xoffset=0 yoffset=0 xadvance=21 page=0 chnl=15
+char id=33 x=419 y=289 width=14 height=56 xoffset=4 yoffset=3 xadvance=21 page=0 chnl=15
+char id=34 x=391 y=305 width=24 height=22 xoffset=2 yoffset=3 xadvance=26 page=0 chnl=15
+char id=35 x=178 y=228 width=44 height=58 xoffset=-1 yoffset=2 xadvance=41 page=0 chnl=15
+char id=36 x=266 y=254 width=39 height=66 xoffset=1 yoffset=0 xadvance=41 page=0 chnl=15
+char id=37 x=0 y=187 width=61 height=58 xoffset=2 yoffset=2 xadvance=65 page=0 chnl=15
+char id=38 x=128 y=57 width=49 height=58 xoffset=1 yoffset=2 xadvance=49 page=0 chnl=15
+char id=39 x=442 y=0 width=13 height=22 xoffset=1 yoffset=3 xadvance=14 page=0 chnl=15
+char id=40 x=419 y=0 width=22 height=72 xoffset=3 yoffset=2 xadvance=24 page=0 chnl=15
+char id=41 x=419 y=73 width=22 height=72 xoffset=3 yoffset=2 xadvance=24 page=0 chnl=15
+char id=42 x=141 y=414 width=28 height=26 xoffset=1 yoffset=2 xadvance=29 page=0 chnl=15
+char id=43 x=266 y=188 width=40 height=38 xoffset=2 yoffset=13 xadvance=43 page=0 chnl=15
+char id=44 x=442 y=23 width=13 height=21 xoffset=4 yoffset=48 xadvance=21 page=0 chnl=15
+char id=45 x=266 y=437 width=24 height=10 xoffset=1 yoffset=33 xadvance=24 page=0 chnl=15
+char id=46 x=141 y=441 width=13 height=11 xoffset=5 yoffset=48 xadvance=21 page=0 chnl=15
+char id=47 x=352 y=393 width=26 height=58 xoffset=-2 yoffset=2 xadvance=21 page=0 chnl=15
+char id=48 x=266 y=321 width=39 height=57 xoffset=1 yoffset=3 xadvance=41 page=0 chnl=15
+char id=49 x=391 y=248 width=25 height=56 xoffset=6 yoffset=3 xadvance=41 page=0 chnl=15
+char id=50 x=225 y=289 width=40 height=56 xoffset=0 yoffset=3 xadvance=41 page=0 chnl=15
+char id=51 x=225 y=57 width=40 height=57 xoffset=1 yoffset=3 xadvance=41 page=0 chnl=15
+char id=52 x=229 y=0 width=41 height=56 xoffset=-1 yoffset=3 xadvance=41 page=0 chnl=15
+char id=53 x=225 y=346 width=40 height=56 xoffset=1 yoffset=4 xadvance=41 page=0 chnl=15
+char id=54 x=266 y=379 width=39 height=57 xoffset=1 yoffset=3 xadvance=41 page=0 chnl=15
+char id=55 x=312 y=58 width=39 height=55 xoffset=2 yoffset=4 xadvance=41 page=0 chnl=15
+char id=56 x=225 y=115 width=40 height=57 xoffset=1 yoffset=3 xadvance=41 page=0 chnl=15
+char id=57 x=225 y=173 width=40 height=57 xoffset=1 yoffset=3 xadvance=41 page=0 chnl=15
+char id=58 x=128 y=414 width=12 height=41 xoffset=5 yoffset=18 xadvance=21 page=0 chnl=15
+char id=59 x=73 y=403 width=13 height=51 xoffset=4 yoffset=18 xadvance=21 page=0 chnl=15
+char id=61 x=266 y=227 width=40 height=26 xoffset=2 yoffset=19 xadvance=43 page=0 chnl=15
+char id=63 x=312 y=0 width=39 height=57 xoffset=1 yoffset=2 xadvance=41 page=0 chnl=15
+char id=64 x=0 y=57 width=72 height=72 xoffset=2 yoffset=2 xadvance=74 page=0 chnl=15
+char id=65 x=75 y=0 width=54 height=56 xoffset=-2 yoffset=3 xadvance=49 page=0 chnl=15
+char id=66 x=178 y=287 width=44 height=56 xoffset=4 yoffset=3 xadvance=49 page=0 chnl=15
+char id=67 x=73 y=344 width=51 height=58 xoffset=2 yoffset=2 xadvance=52 page=0 chnl=15
+char id=68 x=128 y=116 width=48 height=56 xoffset=4 yoffset=3 xadvance=52 page=0 chnl=15
+char id=69 x=178 y=344 width=44 height=56 xoffset=4 yoffset=3 xadvance=49 page=0 chnl=15
+char id=70 x=271 y=0 width=40 height=56 xoffset=4 yoffset=3 xadvance=44 page=0 chnl=15
+char id=71 x=73 y=114 width=53 height=58 xoffset=2 yoffset=2 xadvance=57 page=0 chnl=15
+char id=72 x=128 y=357 width=46 height=56 xoffset=4 yoffset=3 xadvance=52 page=0 chnl=15
+char id=73 x=442 y=159 width=12 height=56 xoffset=5 yoffset=3 xadvance=21 page=0 chnl=15
+char id=74 x=352 y=335 width=34 height=57 xoffset=0 yoffset=3 xadvance=36 page=0 chnl=15
+char id=75 x=128 y=173 width=48 height=56 xoffset=4 yoffset=3 xadvance=49 page=0 chnl=15
+char id=76 x=352 y=43 width=37 height=56 xoffset=4 yoffset=3 xadvance=41 page=0 chnl=15
+char id=77 x=73 y=57 width=54 height=56 xoffset=4 yoffset=3 xadvance=60 page=0 chnl=15
+char id=78 x=182 y=0 width=46 height=56 xoffset=4 yoffset=3 xadvance=52 page=0 chnl=15
+char id=79 x=0 y=395 width=55 height=58 xoffset=2 yoffset=2 xadvance=57 page=0 chnl=15
+char id=80 x=178 y=171 width=45 height=56 xoffset=4 yoffset=3 xadvance=49 page=0 chnl=15
+char id=81 x=0 y=246 width=56 height=61 xoffset=1 yoffset=2 xadvance=57 page=0 chnl=15
+char id=82 x=130 y=0 width=51 height=56 xoffset=4 yoffset=3 xadvance=52 page=0 chnl=15
+char id=83 x=128 y=240 width=47 height=58 xoffset=1 yoffset=2 xadvance=49 page=0 chnl=15
+char id=84 x=178 y=57 width=46 height=56 xoffset=0 yoffset=3 xadvance=44 page=0 chnl=15
+char id=85 x=128 y=299 width=46 height=57 xoffset=4 yoffset=3 xadvance=52 page=0 chnl=15
+char id=86 x=73 y=173 width=52 height=56 xoffset=-1 yoffset=3 xadvance=49 page=0 chnl=15
+char id=87 x=0 y=130 width=72 height=56 xoffset=-1 yoffset=3 xadvance=68 page=0 chnl=15
+char id=88 x=73 y=230 width=52 height=56 xoffset=-1 yoffset=3 xadvance=49 page=0 chnl=15
+char id=89 x=73 y=287 width=52 height=56 xoffset=-1 yoffset=3 xadvance=49 page=0 chnl=15
+char id=90 x=178 y=114 width=46 height=56 xoffset=0 yoffset=3 xadvance=44 page=0 chnl=15
+char id=91 x=391 y=385 width=20 height=70 xoffset=3 yoffset=3 xadvance=21 page=0 chnl=15
+char id=93 x=419 y=218 width=19 height=70 xoffset=0 yoffset=3 xadvance=21 page=0 chnl=15
+char id=94 x=352 y=302 width=36 height=32 xoffset=0 yoffset=2 xadvance=34 page=0 chnl=15
+char id=95 x=128 y=230 width=48 height=9 xoffset=-3 yoffset=65 xadvance=41 page=0 chnl=15
+char id=97 x=178 y=401 width=40 height=44 xoffset=1 yoffset=16 xadvance=41 page=0 chnl=15
+char id=98 x=312 y=173 width=38 height=57 xoffset=3 yoffset=3 xadvance=41 page=0 chnl=15
+char id=99 x=312 y=405 width=38 height=44 xoffset=1 yoffset=16 xadvance=36 page=0 chnl=15
+char id=100 x=312 y=231 width=38 height=57 xoffset=1 yoffset=3 xadvance=41 page=0 chnl=15
+char id=101 x=225 y=403 width=40 height=44 xoffset=1 yoffset=16 xadvance=41 page=0 chnl=15
+char id=102 x=391 y=0 width=27 height=57 xoffset=-1 yoffset=2 xadvance=21 page=0 chnl=15
+char id=103 x=312 y=114 width=38 height=58 xoffset=1 yoffset=16 xadvance=41 page=0 chnl=15
+char id=104 x=352 y=100 width=36 height=56 xoffset=3 yoffset=3 xadvance=41 page=0 chnl=15
+char id=105 x=442 y=45 width=12 height=56 xoffset=3 yoffset=3 xadvance=16 page=0 chnl=15
+char id=106 x=419 y=146 width=20 height=71 xoffset=-5 yoffset=3 xadvance=16 page=0 chnl=15
+char id=107 x=352 y=157 width=36 height=56 xoffset=3 yoffset=3 xadvance=36 page=0 chnl=15
+char id=108 x=442 y=102 width=12 height=56 xoffset=3 yoffset=3 xadvance=16 page=0 chnl=15
+char id=109 x=0 y=308 width=56 height=43 xoffset=3 yoffset=16 xadvance=60 page=0 chnl=15
+char id=110 x=352 y=214 width=36 height=43 xoffset=3 yoffset=16 xadvance=41 page=0 chnl=15
+char id=111 x=266 y=57 width=40 height=44 xoffset=1 yoffset=16 xadvance=41 page=0 chnl=15
+char id=112 x=312 y=289 width=38 height=57 xoffset=3 yoffset=16 xadvance=41 page=0 chnl=15
+char id=113 x=312 y=347 width=38 height=57 xoffset=1 yoffset=16 xadvance=41 page=0 chnl=15
+char id=114 x=391 y=204 width=26 height=43 xoffset=3 yoffset=16 xadvance=24 page=0 chnl=15
+char id=115 x=87 y=403 width=37 height=44 xoffset=0 yoffset=16 xadvance=36 page=0 chnl=15
+char id=116 x=391 y=328 width=23 height=56 xoffset=0 yoffset=4 xadvance=21 page=0 chnl=15
+char id=117 x=352 y=258 width=36 height=43 xoffset=3 yoffset=17 xadvance=41 page=0 chnl=15
+char id=118 x=266 y=102 width=40 height=42 xoffset=-1 yoffset=17 xadvance=36 page=0 chnl=15
+char id=119 x=0 y=352 width=56 height=42 xoffset=-1 yoffset=17 xadvance=52 page=0 chnl=15
+char id=120 x=266 y=145 width=40 height=42 xoffset=-1 yoffset=17 xadvance=36 page=0 chnl=15
+char id=121 x=225 y=231 width=40 height=57 xoffset=-1 yoffset=17 xadvance=36 page=0 chnl=15
+char id=122 x=352 y=0 width=38 height=42 xoffset=0 yoffset=17 xadvance=36 page=0 chnl=15
+char id=123 x=391 y=58 width=26 height=72 xoffset=0 yoffset=2 xadvance=25 page=0 chnl=15
+char id=124 x=442 y=216 width=11 height=72 xoffset=5 yoffset=2 xadvance=19 page=0 chnl=15
+char id=125 x=391 y=131 width=26 height=72 xoffset=0 yoffset=2 xadvance=25 page=0 chnl=15
+char id=8470 x=0 y=0 width=74 height=56 xoffset=4 yoffset=3 xadvance=78 page=0 chnl=15
+`
+
+const text = "Hello, WebGPU";
+const canvas = document.getElementById("myCanvas");
+
+/* ================= FONT ATLAS PARSER ================= */
+
+function create_atlas_from_fnt(fnt) {
+    const atlas = new Map();
+    for (const line of fnt.split("\n")) {
+        if (!line.startsWith("char ")) continue;
+        const parts = Object.fromEntries(
+            line.split(" ").map(p => p.split("="))
+        );
+        atlas.set(parseInt(parts.id), {
+            x: +parts.x, y: +parts.y,
+            width: +parts.width, height: +parts.height,
+            xoffset: +parts.xoffset,
+            yoffset: +parts.yoffset,
+            xadvance: +parts.xadvance
+        });
+    }
+    return atlas;
+}
+
+const atlas = create_atlas_from_fnt(fnt_source);
+const atlasWidth = 455;
+const atlasHeight = 455;
+
+/* ================= WEBGPU INIT ================= */
+
+if (!navigator.gpu) throw "WebGPU not supported";
+
+const adapter = await navigator.gpu.requestAdapter();
+const device  = await adapter.requestDevice();
+
+const context = canvas.getContext("webgpu");
+const format = navigator.gpu.getPreferredCanvasFormat();
+
+context.configure({
+    device,
+    format,
+    alphaMode: "premultiplied",
+});
+
+/* ================= SHADERS ================= */
+
+const wgsl = `
+struct Uniforms {
+    resolution : vec2<f32>
+};
+
+@group(0) @binding(0)
+var<uniform> u : Uniforms;
+
+@group(0) @binding(1)
+var tex : texture_2d<f32>;
+
+@group(0) @binding(2)
+var samp : sampler;
+
+struct VSIn {
+    @location(0) pos : vec2<f32>,
+    @location(1) uv  : vec2<f32>,
+    @location(2) offset : vec2<f32>,
+    @location(3) size   : vec2<f32>,
+    @location(4) uvRect : vec4<f32>,
+};
+
+struct VSOut {
+    @builtin(position) position : vec4<f32>,
+    @location(0) vuv : vec2<f32>,
+};
+
+@vertex
+fn vs_main(i : VSIn) -> VSOut {
+    var o : VSOut;
+    let p = i.pos * i.size + i.offset;
+    let clip = (p / u.resolution) * 2.0 - 1.0;
+    o.position = vec4(clip.x, -clip.y, 0.0, 1.0);
+    o.vuv = i.uvRect.xy + i.uv * i.uvRect.zw;
+    return o;
+}
+
+@fragment
+fn fs_main(i : VSOut) -> @location(0) vec4<f32> {
+    return textureSample(tex, samp, i.vuv);
+}
+`;
+
+/* ================= BUFFERS ================= */
+
+// quad (pos + uv)
+const quad = new Float32Array([
+    0,0, 0,0,
+    1,0, 1,0,
+    0,1, 0,1,
+    0,1, 0,1,
+    1,0, 1,0,
+    1,1, 1,1
+]);
+
+const quadBuffer = device.createBuffer({
+    size: quad.byteLength,
+    usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
+});
+device.queue.writeBuffer(quadBuffer, 0, quad);
+
+// instance buffers
+const count = text.length;
+const offsets = new Float32Array(count * 2);
+const sizes   = new Float32Array(count * 2);
+const uvRects = new Float32Array(count * 4);
+
+let px = 0;
+for (let i = 0; i < count; i++) {
+    const g = atlas.get(text.charCodeAt(i));
+    offsets[i*2]   = canvas.width + px;
+    offsets[i*2+1] = canvas.height / 2 + g.yoffset;
+    sizes[i*2]     = g.width;
+    sizes[i*2+1]   = g.height;
+    uvRects.set([
+        g.x / atlasWidth,
+        g.y / atlasHeight,
+        g.width / atlasWidth,
+        g.height / atlasHeight
+    ], i*4);
+    px += g.xadvance;
+}
+
+function makeInstanceBuffer(data) {
+    const b = device.createBuffer({
+        size: data.byteLength,
+        usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
+    });
+    device.queue.writeBuffer(b, 0, data);
+    return b;
+}
+
+const offsetBuffer = makeInstanceBuffer(offsets);
+const sizeBuffer   = makeInstanceBuffer(sizes);
+const uvBuffer     = makeInstanceBuffer(uvRects);
+
+// uniform buffer
+const uniformBuffer = device.createBuffer({
+    size: 8,
+    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
+});
+device.queue.writeBuffer(uniformBuffer, 0,
+    new Float32Array([canvas.width, canvas.height])
+);
+
+/* ================= TEXTURE ================= */
+
+
+const response = await fetch('font.png');
+const bitmap = await createImageBitmap(await response.blob());
+
+const texture = device.createTexture({
+    size: [bitmap.width, bitmap.height, 1],
+    format: "rgba8unorm",
+    usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
+});
+
+device.queue.copyExternalImageToTexture(
+    { source: bitmap },
+    { texture: texture },
+    [bitmap.width, bitmap.height]
+);
+
+const sampler = device.createSampler({
+    minFilter: "linear",
+    magFilter: "linear"
+});
+
+
+/* ================= PIPELINE ================= */
+
+const pipeline = device.createRenderPipeline({
+    layout: "auto",
+    vertex: {
+        module: device.createShaderModule({ code: wgsl }),
+        entryPoint: "vs_main",
+        buffers: [
+            { arrayStride: 16, attributes: [
+                { shaderLocation: 0, offset: 0, format: "float32x2" },
+                { shaderLocation: 1, offset: 8, format: "float32x2" }
+            ]},
+            { arrayStride: 8, stepMode: "instance",
+                attributes: [{ shaderLocation: 2, offset: 0, format: "float32x2" }] },
+            { arrayStride: 8, stepMode: "instance",
+                attributes: [{ shaderLocation: 3, offset: 0, format: "float32x2" }] },
+            { arrayStride: 16, stepMode: "instance",
+                attributes: [{ shaderLocation: 4, offset: 0, format: "float32x4" }] }
+        ]
+    },
+    fragment: {
+        module: device.createShaderModule({ code: wgsl }),
+        entryPoint: "fs_main",
+        targets: [{
+            format,
+            blend: {
+                color: { srcFactor: "src-alpha", dstFactor: "one-minus-src-alpha" },
+                alpha: { srcFactor: "one", dstFactor: "one-minus-src-alpha" }
+            }
+        }]
+    },
+    primitive: { topology: "triangle-list" }
+});
+
+const bindGroup = device.createBindGroup({
+    layout: pipeline.getBindGroupLayout(0),
+    entries: [
+        { binding: 0, resource: { buffer: uniformBuffer }},
+        { binding: 1, resource: texture.createView() },
+        { binding: 2, resource: sampler }
+    ]
+});
+
+/* ================= RENDER LOOP ================= */
+
+function frame() {
+    for (let i = 0; i < count; i++) offsets[i*2] -= 2.0;
+
+    if (offsets[(count-1)*2] < -30) {
+        let x = 0;
+        for (let i = 0; i < count; i++) {
+            const g = atlas.get(text.charCodeAt(i));
+            offsets[i*2] = canvas.width + x;
+            x += g.xadvance;
+        }
+    }
+
+    device.queue.writeBuffer(offsetBuffer, 0, offsets);
+
+    const encoder = device.createCommandEncoder();
+    const pass = encoder.beginRenderPass({
+        colorAttachments: [{
+            view: context.getCurrentTexture().createView(),
+            clearValue: { r:0, g:0, b:0, a:1 },
+            loadOp: "clear",
+            storeOp: "store"
+        }]
+    });
+
+    pass.setPipeline(pipeline);
+    pass.setBindGroup(0, bindGroup);
+    pass.setVertexBuffer(0, quadBuffer);
+    pass.setVertexBuffer(1, offsetBuffer);
+    pass.setVertexBuffer(2, sizeBuffer);
+    pass.setVertexBuffer(3, uvBuffer);
+    pass.draw(6, count);
+    pass.end();
+
+    device.queue.submit([encoder.finish()]);
+    requestAnimationFrame(frame);
+}
+
+frame();
+}
+
+main();
+</script>
+
+</body>
+</html>

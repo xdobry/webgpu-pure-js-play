@@ -1,0 +1,673 @@
+<html>
+<head>
+    <title>WebGPU 2d retro game</title>  
+    <style>
+ html, body {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    overflow: hidden;
+}
+
+body {
+    display: flex;
+    align-items: center;     /* vertical centering */
+    justify-content: center; /* horizontal centering */
+    background: rgb(46, 46, 46);       /* unused area color */
+}
+
+canvas {
+    aspect-ratio: 1200 / 800;
+    max-width: 100vw;
+    max-height: 100vh;
+    width: auto;
+    height: auto;
+
+    image-rendering: pixelated; /* optional: retro look */
+}
+    </style>
+</head>
+<body>
+    <canvas id="myCanvas" width="1200" height="800" style="border:1px solid #000000;"></canvas>
+    <script type="module">
+import { sprite_atlas } from './sprite_atlas.js';
+import { TextState } from './text_gpu.js';
+
+async function main() {
+
+const canvas = document.getElementById("myCanvas");
+
+
+/* ================= WEBGPU INIT ================= */
+
+if (!navigator.gpu) throw "WebGPU not supported";
+
+const adapter = await navigator.gpu.requestAdapter();
+const device  = await adapter.requestDevice();
+
+const context = canvas.getContext("webgpu");
+const format = navigator.gpu.getPreferredCanvasFormat();
+
+context.configure({
+    device,
+    format,
+    alphaMode: "premultiplied",
+});
+
+/* ================= SHADERS ================= */
+
+const wgsl = `
+struct Uniforms {
+    resolution : vec2<f32>
+};
+
+@group(0) @binding(0)
+var<uniform> u : Uniforms;
+
+@group(0) @binding(1)
+var tex : texture_2d<f32>;
+
+@group(0) @binding(2)
+var samp : sampler;
+
+struct VSIn {
+    @location(0) pos : vec2<f32>,
+    @location(1) uv  : vec2<f32>,
+    @location(2) offset : vec2<f32>,
+    @location(3) size   : vec2<f32>,
+    @location(4) uvRect : vec4<f32>,
+    @location(5) destroy : vec2<f32>,
+};
+
+struct VSOut {
+    @builtin(position) position : vec4<f32>,
+    @location(0) vuv : vec2<f32>,
+    @location(1) vlocal  : vec2<f32>, // local UV (0..1)
+    @location(2) destroy : vec2<f32>,
+};
+
+@vertex
+fn vs_main(i : VSIn) -> VSOut {
+    var o : VSOut;
+    let p = i.pos * i.size + i.offset;
+    let clip = (p / u.resolution) * 2.0 - 1.0;
+    o.position = vec4(clip.x, -clip.y, 0.0, 1.0);
+    o.vuv = i.uvRect.xy + i.uv * i.uvRect.zw;
+    o.vlocal = i.uv;
+    o.destroy = i.destroy;
+    return o;
+}
+
+fn hash(p : vec2<f32>) -> f32 {
+    let h = dot(p, vec2<f32>(127.1, 311.7));
+    return fract(sin(h) * 43758.5453);
+}
+
+@fragment
+fn fs_main(i : VSOut) -> @location(0) vec4<f32> {
+    var col = textureSample(tex, samp, i.vuv);
+
+    let progress = i.destroy.x;
+    if (progress <= 0.0) {
+        return col; // not destroyed
+    }
+
+    // ---------- noise breakup ----------
+    let n = hash(i.vlocal * 40.0 + i.destroy.y);
+
+    // threshold grows with progress
+    if (n < progress) {
+        discard;
+    }
+
+    // ---------- grayscale ----------
+    let gray = dot(col.rgb, vec3<f32>(0.299, 0.587, 0.114));
+    col = vec4<f32>(
+        mix(col.rgb, vec3<f32>(gray), progress),
+        col.a
+    );
+
+    // ---------- radial burn ----------
+    let center = i.vlocal - vec2<f32>(0.5);
+    let dist = length(center) * 2.0;
+    let burn = smoothstep(progress, progress + 0.2, dist);
+
+    col = vec4<f32>(
+        col.rgb * burn,
+        col.a
+    );
+
+    // ---------- alpha fade ----------
+    col = vec4<f32>(
+        col.rgb,
+        col.a * (1.0 - progress)
+    );
+
+    return col;
+}
+`;
+
+/* ================= BUFFERS ================= */
+
+// quad (pos + uv)
+const quad = new Float32Array([
+    0,0, 0,0,
+    1,0, 1,0,
+    0,1, 0,1,
+    0,1, 0,1,
+    1,0, 1,0,
+    1,1, 1,1
+]);
+
+const quadBuffer = device.createBuffer({
+    size: quad.byteLength,
+    usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
+});
+device.queue.writeBuffer(quadBuffer, 0, quad);
+
+// instance buffers
+const max_sprites = 200;
+const offsets = new Float32Array(max_sprites * 2);
+const sizes   = new Float32Array(max_sprites * 2);
+const uvRects = new Float32Array(max_sprites * 4);
+const destroys = new Float32Array(max_sprites * 4);
+
+async function load_bitmap(url) {
+    const response = await fetch(url);
+    const bitmap = await createImageBitmap(await response.blob());
+    return bitmap;
+}
+
+const bitmap = await load_bitmap('sheet.png');
+const font_bitmap = await load_bitmap('ssr.png');
+const atlasWidth = bitmap.width;
+const atlasHeight = bitmap.height;
+
+const textState = new TextState(font_bitmap.width, font_bitmap.height);
+
+function makeInstanceBuffer(data) {
+    const b = device.createBuffer({
+        size: data.byteLength,
+        usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
+    });
+    device.queue.writeBuffer(b, 0, data);
+    return b;
+}
+
+const offsetBuffer = makeInstanceBuffer(offsets);
+const sizeBuffer   = makeInstanceBuffer(sizes);
+const uvBuffer     = makeInstanceBuffer(uvRects);
+const destroysBuffer = makeInstanceBuffer(destroys);
+
+// uniform buffer
+const uniformBuffer = device.createBuffer({
+    size: 8,
+    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
+});
+device.queue.writeBuffer(uniformBuffer, 0,
+    new Float32Array([canvas.width, canvas.height])
+);
+
+/* ================= TEXTURE ================= */
+
+function createTextureFromBitmap(bitmap) {
+    const texture = device.createTexture({
+        size: [bitmap.width, bitmap.height, 1],
+        format: "rgba8unorm",
+        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
+    });
+    device.queue.copyExternalImageToTexture(
+        { source: bitmap },
+        { texture: texture },
+        [bitmap.width, bitmap.height]
+    );
+    return texture;
+}
+
+const texture = createTextureFromBitmap(bitmap);
+const font_texture = createTextureFromBitmap(font_bitmap);
+
+const sampler = device.createSampler({
+    minFilter: "linear",
+    magFilter: "linear"
+});
+
+// ================== Sound ================== */
+
+const sounds = {};
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+async function loadSFX(name, url) {
+    const fetchPromise = fetch(url).then(r => r.arrayBuffer());
+    const buf = await fetchPromise;
+    sounds[name] = await audioCtx.decodeAudioData(buf);
+}
+
+function playSFX(name) {
+    if (!sounds[name]) return;
+    const src = audioCtx.createBufferSource();
+    src.buffer = sounds[name];
+    src.connect(audioCtx.destination);
+    src.start();
+}
+
+await Promise.all([
+    loadSFX("laser", "sfx_laser1.ogg"),
+    loadSFX("explosion", "sfx_shieldUp.ogg"),
+    loadSFX("lose", "sfx_lose.ogg"),
+]);
+
+// ================= SCENE ================= */
+
+class Sprite {
+    constructor(name) {
+        this.name = name;
+        this.x = 0.0;
+        this.y = 0.0;
+        this.w = sprite_atlas[name].w;
+        this.h = sprite_atlas[name].h;
+        this.destroy = 0.0;
+        this.destroy_seed = 0.0;        
+        this.active = true;
+    }
+    collide(sprite) {
+        return !(
+            this.x + this.w < sprite.x ||
+            this.x > sprite.x + sprite.w ||
+            this.y + this.h < sprite.y ||
+            this.y > sprite.y + sprite.h
+        );
+    }
+    start_destroy() {
+        if (this.destroy === 0.0) {
+            this.destroy = 0.001; // start destruction
+            this.destroy_seed = Math.random() * 1000.0;
+        }
+    }
+    update(dt) {
+        if (this.destroy > 0.0) {
+            this.destroy += dt;
+            if (this.destroy > 1.0) {
+                this.active = false;
+                this.destroy = 1.0;
+            }
+        }
+    }
+}
+
+class Scene {
+    constructor() {
+        this.sprites = [];
+        this.player = new Sprite("playerShip1_orange");
+        this.beams = [];
+        this.enemies = [];
+        this.bombs = [];
+        this.state = "start";
+        this.enemy_type = "formation"; // "falling"
+    }
+    player_fire() {
+        const beam = new Sprite("fire00")
+        beam.x = this.player.x + this.player.w / 2 - beam.w/2, 
+        beam.y = this.player.y - beam.h;
+        this.beams.push(beam);
+        this.sprites.push(beam);
+        playSFX("laser");
+    }
+    start_play() {
+        textState.cls()
+        this.state = "play";
+        this.enemy_type = "formation";
+        this.player.active = true;
+        this.player.destroy = 0.0;
+        this.enemies.length = 0;
+        this.beams.length = 0;
+        this.sprites.length = 0;
+        this.delay_enemy = 0.0;
+        if (!this.sprites.includes(this.player)) {
+            this.player.x = (canvas.width - this.player.w) / 2;
+            this.player.y = canvas.height - this.player.h - 10;
+            this.sprites.push(this.player);
+        }
+        if (this.enemy_type === "formation") {
+            this.start_formation();
+        } else if (this.enemy_type === "falling") {
+            this.enemies_to_fall = 30;            
+        }
+    }
+    start_formation() {
+        this.formation_v = 10; // pixels per second
+        this.enemy_type = "formation";
+        for (let i=0; i<8; i++) {
+            for (let j=0; j<3; j++) {
+                const enemy = new Sprite("enemyRed1");
+                enemy.x = 50 + i * (enemy.w + 40);
+                enemy.y = 20 + j * (enemy.h + 20);
+                this.enemies.push(enemy);
+                this.sprites.push(enemy);
+            }
+        }
+    }
+    game_over() {
+        this.state = "game_over";
+        textState.set_text("GAME OVER", canvas.width/2, canvas.height / 2 - 40, 2.0, "center");
+        textState.set_text("PRESS SPACE TO RESTART GAME", canvas.width/2, canvas.height / 2 + 100, 0.3, "center");
+    }
+    remove_sprite(sprite) {
+        const index = this.sprites.indexOf(sprite);
+        if (index !== -1) this.sprites.splice(index, 1);
+    }
+    update(dt) {
+        if (this.state !== "play") {
+            return;
+        }
+        if (!this.player.active) {
+            this.game_over();
+            return;
+        }
+        for (let i = this.beams.length - 1; i >= 0; i--) {
+            const beam = this.beams[i];
+            beam.y -= 300 * dt;
+            if (beam.y < -16) {
+                this.beams.splice(i, 1);
+                this.remove_sprite(beam);
+            }
+        }
+        for (let i = this.enemies.length - 1; i >= 0; i--) {
+            const enemy = this.enemies[i];
+            if (this.player.collide(enemy)) {
+                enemy.start_destroy();
+                this.enemies.splice(i, 1);
+                this.player.start_destroy();
+                playSFX("lose");
+                continue;
+            }
+            for (let j = this.beams.length - 1; j >= 0; j--) {
+                const beam = this.beams[j];
+                if (beam.collide(enemy)) {
+                    enemy.start_destroy();
+                    this.enemies.splice(i, 1);
+                    this.beams.splice(j, 1);
+                    this.remove_sprite(beam);
+                    playSFX("explosion");
+                    break;
+                }
+            }
+            // Random drop bomb
+            if (Math.random() < 0.01 * dt * 10) {
+                const bomb = new Sprite("laserBlue02");
+                bomb.x = enemy.x + enemy.w / 2 - bomb.w / 2;
+                bomb.y = enemy.y + enemy.h;
+                this.bombs.push(bomb);
+                this.sprites.push(bomb);
+            }
+        }
+        for (let i = this.bombs.length - 1; i >= 0; i--) {
+            const bomb = this.bombs[i];
+            if (this.player.collide(bomb)) {
+                bomb.start_destroy();
+                this.bombs.splice(i, 1);
+                this.player.start_destroy();
+                playSFX("lose");
+                continue;
+            }
+            bomb.y += 250 * dt;
+            if (bomb.y > canvas.height) {
+                this.bombs.splice(i, 1);
+                this.remove_sprite(bomb);
+                continue;
+            }
+        }
+        for (let i=this.sprites.length-1; i>=0; i--) {
+            const sprite = this.sprites[i]
+            sprite.update(dt);
+            if (!sprite.active) {
+                this.sprites.splice(i, 1);
+            }
+        }
+        this.enemy_move(dt);
+    }
+    enemy_move(dt) {
+        if (this.enemy_type === "falling") {
+            for (let i = this.enemies.length - 1; i >= 0; i--) {
+                const enemy = this.enemies[i];
+                enemy.y += 50 * dt;
+                if (enemy.y > canvas.height) {
+                    this.enemies.splice(i, 1);
+                    this.remove_sprite(enemy);
+                    this.game_over();
+                }
+            }
+            if (this.enemies.length < 5) {
+                if (this.enemies_to_fall>=0) {
+                    if (this.delay_enemy > 0.0) {
+                        this.delay_enemy -= dt;
+                    } else {
+                        const enemy = new Sprite("enemyRed1");
+                        enemy.x = Math.random() * (canvas.width - enemy.w);
+                        enemy.y = -enemy.h
+                        if (isNaN(enemy.y)) {
+                            console.log("NaN enemy y");
+                        } 
+                        this.enemies.push(enemy);
+                        this.sprites.push(enemy);
+                        this.enemies_to_fall -= 1;
+                        this.delay_enemy = 1.0 + Math.random() * 1.5;
+                    }
+                } else if (this.enemies.length == 0) {
+                    this.start_formation();
+                }
+            }
+        } else if (this.enemy_type === "formation") {
+            let move_down = false;
+            for (const enemy of this.enemies) {
+                enemy.x += this.formation_v * dt;
+                if (enemy.x + enemy.w >= canvas.width || enemy.x <= 0) {
+                    move_down = true;
+                }
+            }
+            if (move_down) {
+                this.formation_v = -this.formation_v;
+                this.formation_v += 10 * Math.sign(this.formation_v); // speed up
+                for (const enemy of this.enemies) {
+                    enemy.y += 20;
+                }
+            }
+            if (this.enemies.length === 0) {
+                this.enemy_type = "falling";
+                this.enemies_to_fall = 30;
+            }
+        }
+    }
+}
+
+const scene = new Scene();
+textState.set_text("WEBGPU INVADER", canvas.width/2, canvas.height / 2 - 100, 1.0, "center");
+textState.set_text("PRESS SPACE", canvas.width/2, canvas.height / 2 + 20, 0.5, "center");
+
+const keys = {
+  left: false,
+  right: false,
+  fire: false
+};
+
+window.addEventListener("keydown", (e) => {
+  if (e.code === "ArrowLeft") keys.left = true;
+  if (e.code === "ArrowRight") keys.right = true;
+  if (e.code === "Space") keys.fire = true;
+});
+
+window.addEventListener("keyup", (e) => {
+  if (e.code === "ArrowLeft") keys.left = false;
+  if (e.code === "ArrowRight") keys.right = false;
+});
+
+
+/* ================= PIPELINE ================= */
+
+const pipeline = device.createRenderPipeline({
+    layout: "auto",
+    vertex: {
+        module: device.createShaderModule({ code: wgsl }),
+        entryPoint: "vs_main",
+        buffers: [
+            { arrayStride: 16, attributes: [
+                { shaderLocation: 0, offset: 0, format: "float32x2" },
+                { shaderLocation: 1, offset: 8, format: "float32x2" }
+            ]},
+            { arrayStride: 8, stepMode: "instance",
+                attributes: [{ shaderLocation: 2, offset: 0, format: "float32x2" }] },
+            { arrayStride: 8, stepMode: "instance",
+                attributes: [{ shaderLocation: 3, offset: 0, format: "float32x2" }] },
+            { arrayStride: 16, stepMode: "instance",
+                attributes: [{ shaderLocation: 4, offset: 0, format: "float32x4" }] },
+            { arrayStride: 16, stepMode: "instance",
+                attributes: [{ shaderLocation: 5, offset: 0, format: "float32x4" }] }
+        ]
+    },
+    fragment: {
+        module: device.createShaderModule({ code: wgsl }),
+        entryPoint: "fs_main",
+        targets: [{
+            format,
+            blend: {
+                color: { srcFactor: "src-alpha", dstFactor: "one-minus-src-alpha" },
+                alpha: { srcFactor: "one", dstFactor: "one-minus-src-alpha" }
+            }
+        }]
+    },
+    primitive: { topology: "triangle-list" }
+});
+
+const bindGroup = device.createBindGroup({
+    layout: pipeline.getBindGroupLayout(0),
+    entries: [
+        { binding: 0, resource: { buffer: uniformBuffer }},
+        { binding: 1, resource: texture.createView() },
+        { binding: 2, resource: sampler }
+    ]
+});
+
+const fontBindGroup = device.createBindGroup({
+    layout: pipeline.getBindGroupLayout(0),
+    entries: [
+        { binding: 0, resource: { buffer: uniformBuffer }},
+        { binding: 1, resource: font_texture.createView() },
+        { binding: 2, resource: sampler }
+    ]
+});
+
+/* game update */
+
+const player_speed = 200; // pixels per second
+function update(dt) {
+  if (scene.state !== "play") {
+      if (keys.fire) {
+          scene.start_play();
+          keys.fire = false;
+      }
+  } else {
+    if (keys.left) {
+        scene.player.x -= player_speed * dt;
+        if (scene.player.x < 0) scene.player.x = 0;   
+    }
+    if (keys.right) {
+        scene.player.x += player_speed * dt;
+        if (scene.player.x > canvas.width - scene.player.w) {
+        scene.player.x = canvas.width - scene.player.w;
+        }
+    }
+    if (keys.fire && scene.player.active) {
+        keys.fire = false;
+        if (scene.beams.length==0) {
+            scene.player_fire();
+        }
+    }
+    scene.update(dt);
+  }
+}
+
+/* ================= RENDER LOOP ================= */
+
+
+let lastTime = performance.now();
+function frame(time) {
+    const dt = (time - lastTime) / 1000;
+    lastTime = time;
+    update(dt);
+
+    for (let i =0; i<scene.sprites.length; i++) {
+        const sprite = scene.sprites[i];
+        const info = sprite_atlas[sprite.name];
+        offsets[i*2 + 0] = sprite.x;
+        offsets[i*2 + 1] = sprite.y;
+        sizes[i*2 + 0]   = info.w;
+        sizes[i*2 + 1]   = info.h;
+        uvRects[i*4 + 0] = info.x / atlasWidth;
+        uvRects[i*4 + 1] = info.y / atlasHeight;
+        uvRects[i*4 + 2] = info.w / atlasWidth;
+        uvRects[i*4 + 3] = info.h / atlasHeight;
+        destroys[i*4 + 0] = sprite.destroy;
+        destroys[i*4 + 1] = sprite.destroy_seed;
+    }
+    if (textState.chars.length > 0) {
+        // draw text
+        for (let i =0; i<textState.chars.length; i++) {
+            const ch = textState.chars[i];
+            const idx = i + scene.sprites.length;
+            offsets[idx*2 + 0] = ch.x;
+            offsets[idx*2 + 1] = ch.y;
+            sizes[idx*2 + 0]   = ch.w;
+            sizes[idx*2 + 1]   = ch.h;
+            uvRects[idx*4 + 0] = ch.u;
+            uvRects[idx*4 + 1] = ch.v;
+            uvRects[idx*4 + 2] = ch.uw;
+            uvRects[idx*4 + 3] = ch.vh;
+            destroys[idx*4 + 0] = 0.0;
+            destroys[idx*4 + 1] = 0.0;
+        }
+    }
+
+    device.queue.writeBuffer(offsetBuffer, 0, offsets);
+    device.queue.writeBuffer(sizeBuffer, 0, sizes);
+    device.queue.writeBuffer(uvBuffer, 0, uvRects);
+    device.queue.writeBuffer(destroysBuffer, 0, destroys);
+
+    const encoder = device.createCommandEncoder();
+    const pass = encoder.beginRenderPass({
+        colorAttachments: [{
+            view: context.getCurrentTexture().createView(),
+            clearValue: { r:0, g:0, b:0, a:1 },
+            loadOp: "clear",
+            storeOp: "store"
+        }]
+    });
+
+    pass.setPipeline(pipeline);
+    pass.setBindGroup(0, bindGroup);
+    pass.setVertexBuffer(0, quadBuffer);
+    pass.setVertexBuffer(1, offsetBuffer);
+    pass.setVertexBuffer(2, sizeBuffer);
+    pass.setVertexBuffer(3, uvBuffer);
+    pass.setVertexBuffer(4, destroysBuffer);
+    if (scene.sprites.length > 0) {
+        pass.draw(6, scene.sprites.length);
+    }
+    if (textState.chars.length > 0) {
+        pass.setBindGroup(0, fontBindGroup);
+        pass.draw(6, textState.chars.length, 0, scene.sprites.length);
+    }
+    pass.end();
+
+    device.queue.submit([encoder.finish()]);
+    
+    requestAnimationFrame(frame);
+}
+
+requestAnimationFrame(frame);
+}
+
+main();
+</script>
+
+</body>
+</html>
