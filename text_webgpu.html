@@ -342,11 +342,11 @@ if (!document.hidden) {
 });
 
 
-function frame() {
+function frame(time) {
     const dt = (time - lastTime) / 1000;
     lastTime = time;
     
-    for (let i = 0; i < count; i++) offsets[i*2] -= 2.0 * time;
+    for (let i = 0; i < count; i++) offsets[i*2] -= 100.0 * dt;
 
     if (offsets[(count-1)*2] < -30) {
         let x = 0;
@@ -382,7 +382,7 @@ function frame() {
     requestAnimationFrame(frame);
 }
 
-frame();
+requestAnimationFrame(frame);
 }
 
 main();
