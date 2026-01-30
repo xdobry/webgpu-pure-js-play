@@ -587,9 +587,14 @@ function update(dt) {
 }
 
 /* ================= RENDER LOOP ================= */
-
-
 let lastTime = performance.now();
+
+document.addEventListener("visibilitychange", () => {
+if (!document.hidden) {
+    lastTime = performance.now();
+}
+});
+
 function frame(time) {
     const dt = (time - lastTime) / 1000;
     lastTime = time;

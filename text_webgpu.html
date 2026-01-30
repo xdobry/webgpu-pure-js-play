@@ -333,9 +333,20 @@ const bindGroup = device.createBindGroup({
 });
 
 /* ================= RENDER LOOP ================= */
+let lastTime = performance.now();
+
+document.addEventListener("visibilitychange", () => {
+if (!document.hidden) {
+    lastTime = performance.now();
+}
+});
+
 
 function frame() {
-    for (let i = 0; i < count; i++) offsets[i*2] -= 2.0;
+    const dt = (time - lastTime) / 1000;
+    lastTime = time;
+    
+    for (let i = 0; i < count; i++) offsets[i*2] -= 2.0 * time;
 
     if (offsets[(count-1)*2] < -30) {
         let x = 0;

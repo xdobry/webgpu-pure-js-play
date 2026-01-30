@@ -9,6 +9,10 @@ struct Uniforms {
 @group(0) @binding(0)
 var<uniform> uniforms : Uniforms;
 
+@group(1) @binding(0) var shadowMap : texture_depth_2d;
+@group(1) @binding(1) var shadowSampler : sampler_comparison;
+@group(1) @binding(2) var<uniform> lightViewProj : mat4x4<f32>;
+
 struct VertexInput {
     @location(0) position : vec3<f32>,
     @location(1) normal   : vec3<f32>,
@@ -19,6 +23,7 @@ struct VertexOutput {
     @builtin(position) Position : vec4<f32>,
     @location(0) vNormal : vec3<f32>,
     @location(1) vlocal  : vec2<f32>, // local UV (0..1),
+    @location(2) vShadowPos : vec4<f32>,
 };
 
 @vertex
@@ -27,6 +32,10 @@ fn vs_main(input : VertexInput) -> VertexOutput {
 
     // Model → World
     let worldPos = uniforms.model * vec4<f32>(input.position, 1.0);
+
+    // Light clip space (for shadow lookup)
+    out.vShadowPos = lightViewProj * worldPos;
+    out.vShadowPos.y = -out.vShadowPos.y;
 
     // Final clip-space position
     out.Position =
@@ -53,9 +62,31 @@ fn gridLine(coord: f32, scale: f32) -> f32 {
     return 1.0 - clamp(d, 0.0, 1.0);
 }
 
+fn shadowFactor(shadowPos : vec4<f32>) -> f32 {
+    // For orthographic projection, w = 1 → no perspective divide needed
+    let uv = clamp(shadowPos.xy * 0.5 + vec2<f32>(0.5), vec2<f32>(0.0), vec2<f32>(1.0));
+
+    // Depth in shadow map (clip-space z → 0..1)
+    let depth = shadowPos.z * 0.5 + 0.5;
+
+    // Small bias to avoid self-shadowing
+
+    // Sample shadow map
+    return textureSampleCompare(
+        shadowMap,
+        shadowSampler,
+        uv,
+        depth
+    );
+}
+
+
+
+
 @fragment
 fn fs_main(@location(0) vNormal : vec3<f32>,
-    @location(1) vlocal  : vec2<f32>) -> @location(0) vec4<f32> {
+    @location(1) vlocal  : vec2<f32>,
+    @location(2) vShadowPos : vec4<f32>) -> @location(0) vec4<f32> {
 
     let grey = vec3f(0.7, 0.7, 0.7);
     let red = vec3f(0.635, 0.027, 0.643);
@@ -75,8 +106,11 @@ fn fs_main(@location(0) vNormal : vec3<f32>,
     // Small ambient term
     let ambient = 0.25;
 
-    let lighting = ambient + diffuse * 0.75;
+    // Shadow factor
+    let shadow = shadowFactor(vShadowPos);
+
+    let lighting = ambient + diffuse * shadow * 0.75;
     let finalColor = vColor * lighting;
 
-    return vec4<f32>(finalColor, 1.0);
+    return vec4<f32>(finalColor , 1.0);
 }
