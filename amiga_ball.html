@@ -2,20 +2,25 @@
   <head>
     <title>Amiga Ball</title>
     <style>
-      html,
-      body {
-        width: 100%;
-        height: 100%;
-        margin: 0;
-        padding: 0;
-        overflow: hidden;
-      }
-
-      canvas {
-        display: block; /* removes inline-canvas whitespace */
-        width: 100vw;
-        height: 100vh;
-      }
+html, body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+body {
+  display: flex;
+  align-items: center;     /* vertical centering */
+  justify-content: center; /* horizontal centering */
+  background: black;       /* unused area color */
+}
+canvas {
+  aspect-ratio: 1200 / 800;
+  max-width: 100vw;
+  max-height: 100vh;
+  width: auto;
+  height: auto;
+}
     </style>
   </head>
   <body>
@@ -33,7 +38,10 @@ const canvas = document.getElementById("myCanvas");
 
 /* ================= WEBGPU INIT ================= */
 
-if (!navigator.gpu) throw "WebGPU not supported";
+if (!navigator.gpu) {
+  alert("WebGPU not supported on this browser.");
+  throw "WebGPU not supported";
+}
 
 const adapter = await navigator.gpu.requestAdapter();
 const device = await adapter.requestDevice();
@@ -138,7 +146,7 @@ function mat4Perspective(fovY, aspect, near, far) {
 const model = mat4Identity();
 const view = mat4View(-4);
 const projection = mat4Perspective(Math.PI / 4, canvas.width / canvas.height, 0.1, 100.0);
-const lightDir = [0.2, 0.2, 0.5];
+const lightDir = [0.2, 0.5, 0.5];
 
 const uniformData = new Float32Array([
   ...model,
@@ -166,15 +174,18 @@ function updateUniforms(time, dt) {
         ball.ey = -ball.vy;
       }
       ball.vy = ball.ey;
+      playSFX("ball");
     }
     if (ball.tx > 1.8) {
       ball.tx = 3.6 - ball.tx;
       ball.vx = -ball.vx;
       ball.rd = -ball.rd;
+      playSFX("ball");
     } else if (ball.tx < -1.8) {
       ball.tx = -3.6 - ball.tx;
       ball.vx = -ball.vx;
       ball.rd = -ball.rd;
+      playSFX("ball");
     }
 
     //const model = buildModelMatrix({tx: ball.tx, ty: ball.ty, tz: ball.tz, ry:angle, rz:-0.2, sx:0.5,sy:0.5,sz:0.5});
@@ -406,18 +417,32 @@ const pipelineBG = device.createRenderPipeline({
   },
 });
 
+const bx = 2.5;
+const by = 1.8;
+const bz = -2.0;
 const vertexBGData = new Float32Array([
   // position , normal, uv
   //     5--4,2   
   //     | / |
   //    3,0--1 
-  -2.5, -1.8, -2.0, 0.0, 0.0, 1.0, 0, 0,
-    2.5, -1.8, -2.0, 0.0, 0.0, 1.0, 1, 0,
-    2.5,  1.8, -2.0, 0.0, 0.0, 1.0, 1, 1,
+  -bx, -by, bz, 0.0, 0.0, 1.0, 0, 0,
+    bx, -by, bz, 0.0, 0.0, 1.0, 1, 0,
+    bx,  by, bz, 0.0, 0.0, 1.0, 1, 1,
 
-  -2.5, -1.8, -2.0, 0.0, 0.0, 1.0, 0, 0,
-    2.5,  1.8, -2.0, 0.0, 0.0, 1.0, 1, 1,
-  -2.5,  1.8, -2.0, 0.0, 0.0, 1.0, 0, 1,
+  -bx, -by, bz, 0.0, 0.0, 1.0, 0, 0,
+    bx,  by, bz, 0.0, 0.0, 1.0, 1, 1,
+  -bx,  by, bz, 0.0, 0.0, 1.0, 0, 1,
+
+  // underground
+
+    bx,  -by, 0.0, 0.0, 1.0, 0.0, 1, 1,
+    bx, -by, bz, 0.0, 1.0, 0.0, 1, 0,
+  -bx, -by, bz, 0.0, 1.0, 0.0, 0, 0,
+
+  -bx,  -by, 0.0, 0.0, 1.0, 0.0, 0, 1,
+    bx, -by, 0.0, 0.0, 1.0, 0.0, 1, 1,
+  -bx, -by, bz, 0.0, 1.0, 0.0, 0, 0,
+
 ]);
 
 const vertexBGBuffer = device.createBuffer({
@@ -478,6 +503,41 @@ const shadowBGBindGroup = device.createBindGroup({
   ],
 });
 
+// ================== Sound ================== */
+
+const sounds = {};
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+let audioUnlocked = false;
+
+async function unlockAudio() {
+    if (!audioUnlocked) {
+        await audioCtx.resume();
+        audioUnlocked = true;
+        console.log("Audio unlocked");
+    }
+}
+
+async function loadSFX(name, url) {
+    const fetchPromise = fetch(url).then(r => r.arrayBuffer());
+    const buf = await fetchPromise;
+    sounds[name] = await audioCtx.decodeAudioData(buf);
+}
+
+function playSFX(name) {
+    if (!audioUnlocked) return;
+    if (!sounds[name]) return;
+    const src = audioCtx.createBufferSource();
+    src.buffer = sounds[name];
+    src.connect(audioCtx.destination);
+    src.start();
+}
+
+await Promise.all([
+    loadSFX("ball", "ball.ogg"),
+]);
+
+window.addEventListener("pointerdown", unlockAudio, { once: true });
+window.addEventListener("keydown", unlockAudio, { once: true });
 
 /* ================= RENDER LOOP ================= */
 let lastTime = performance.now();

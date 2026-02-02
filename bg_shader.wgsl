@@ -104,7 +104,7 @@ fn fs_main(@location(0) vNormal : vec3<f32>,
     let diffuse = max(dot(N, L), 0.0);
 
     // Small ambient term
-    let ambient = 0.25;
+    let ambient = 0.55;
 
     // Shadow factor
     let shadow = shadowFactor(vShadowPos);

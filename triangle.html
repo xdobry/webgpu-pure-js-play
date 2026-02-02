@@ -21,10 +21,11 @@
 <canvas id="gfx"></canvas>
 <script type="module">
 (async () => {
-  if (!navigator.gpu) {
-    alert("WebGPU not supported");
-    return;
-  }
+
+if (!navigator.gpu) {
+  alert("WebGPU not supported");
+  return;
+}
 
   const canvas = document.getElementById("gfx");
   const adapter = await navigator.gpu.requestAdapter();
